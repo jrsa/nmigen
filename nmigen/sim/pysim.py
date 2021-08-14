@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 import itertools
+from math import log2
 from vcd import VCDWriter
 from vcd.gtkw import GTKWSave
 
@@ -137,6 +138,11 @@ class _VCDWriter:
             self.gtkw_save.dumpfile(self.vcd_file.name)
             self.gtkw_save.dumpfile_size(self.vcd_file.tell())
 
+            # this is shitty cause it relies on knowing how gtkwave chooses a default zoom, which i dont
+            # note: the gtkwave tcl api has "push-button" support for this:
+            # gtkwave::/Time/Zoom/Zoom_Full
+            self.gtkw_save.zoom_markers(-log2(self.timestamp_to_vcd(timestamp)) - 5)
+
             self.gtkw_save.treeopen("top")
             for signal in self.traces:
                 if len(signal) > 1 and not signal.decoder:
@@ -144,6 +150,10 @@ class _VCDWriter:
                 else:
                     suffix = ""
                 self.gtkw_save.trace(".".join(self.gtkw_names[signal]) + suffix)
+
+                # optionally add another trace for the same signal with overridden display settings
+                if flags := signal.attrs.get('gtkwave_flags'):
+                    self.gtkw_save.trace(".".join(self.gtkw_names[signal]) + suffix, extraflags=flags)
 
         if self.vcd_file is not None:
             self.vcd_file.close()
